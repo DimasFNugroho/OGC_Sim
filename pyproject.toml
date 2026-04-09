@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ogc_sim"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch",
+    "trimesh",
+    "polyscope",
+    "networkx",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ogc_sim*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

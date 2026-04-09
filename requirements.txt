@@ -1,0 +1,7 @@
+numpy
+scipy
+torch
+trimesh
+polyscope
+networkx
+pytest
