@@ -129,7 +129,7 @@ def edge_edge_distance(
     q: np.ndarray,
     r: np.ndarray,
     s: np.ndarray,
-) -> tuple[float, np.ndarray]:
+) -> tuple[float, np.ndarray, float, np.ndarray, float]:
     """
     Compute the distance between line segment pq and line segment rs.
 
@@ -142,11 +142,11 @@ def edge_edge_distance(
 
     Returns
     -------
-    dist : float
-        Minimum distance between the two segments.
-    closest_pt : np.ndarray, shape (3,)
-        The point on segment pq closest to segment rs.
-        (Used as the contact point x_c in Algorithm 2, line 9.)
+    dist       : float          Minimum distance between the two segments.
+    closest_pq : np.ndarray     Closest point on pq  (contact point x_c, Algorithm 2 line 9).
+    t          : float          Parameter along pq  (0 = at p, 1 = at q).
+    closest_rs : np.ndarray     Closest point on rs.
+    u          : float          Parameter along rs  (0 = at r, 1 = at s).
 
     Notes
     -----
@@ -172,7 +172,7 @@ def edge_edge_distance(
 
     if a <= EPSILON and e <= EPSILON:
         # Both segments degenerate to points
-        return np.linalg.norm(p - r), p.copy()
+        return np.linalg.norm(p - r), p.copy(), 0.0, r.copy(), 0.0
 
     if a <= EPSILON:
         # First segment degenerates to a point
@@ -203,7 +203,7 @@ def edge_edge_distance(
 
     closest_pq = p + t * d1
     closest_rs = r + u * d2
-    return np.linalg.norm(closest_pq - closest_rs), closest_pq
+    return np.linalg.norm(closest_pq - closest_rs), closest_pq, t, closest_rs, u
 
 
 # ------------------------------------------------------------------

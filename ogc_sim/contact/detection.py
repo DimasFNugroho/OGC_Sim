@@ -250,7 +250,7 @@ def edge_edge_contact_detection(
 
         ra = mesh.V[int(mesh.E[e2_idx][0])]
         rb = mesh.V[int(mesh.E[e2_idx][1])]
-        dist, _ = edge_edge_distance(ea, eb, ra, rb)
+        dist, *_ = edge_edge_distance(ea, eb, ra, rb)
 
         # line 7: update d_min_e
         d_min_e = min(d_min_e, dist)

@@ -160,7 +160,7 @@ class TestEdgeEdgeDistance:
         p, q = np.array([0.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0])
         r, s = np.array([0.0, 2.0, 0.0]), np.array([1.0, 2.0, 0.0])
 
-        dist, closest = edge_edge_distance(p, q, r, s)
+        dist, closest, *_ = edge_edge_distance(p, q, r, s)
 
         assert_close(dist, 2.0, label="dist")
         # closest point on pq should have Y=0 and be at the same X as
@@ -179,7 +179,7 @@ class TestEdgeEdgeDistance:
         p, q = np.array([-1.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0])
         r, s = np.array([0.0, -1.0, 1.0]), np.array([0.0, 1.0, 1.0])
 
-        dist, closest = edge_edge_distance(p, q, r, s)
+        dist, closest, *_ = edge_edge_distance(p, q, r, s)
 
         assert_close(dist, 1.0, label="dist")
         assert_vec_close(closest, np.array([0.0, 0.0, 0.0]), label="closest_pt")
@@ -189,7 +189,7 @@ class TestEdgeEdgeDistance:
         p, q = np.array([0.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0])
         r, s = np.array([1.0, 0.0, 0.0]), np.array([1.0, 1.0, 0.0])
 
-        dist, closest = edge_edge_distance(p, q, r, s)
+        dist, closest, *_ = edge_edge_distance(p, q, r, s)
 
         assert_close(dist, 0.0, label="dist")
 
@@ -203,7 +203,7 @@ class TestEdgeEdgeDistance:
         p, q = np.array([0.0, 0.0, 2.0]), np.array([0.0, 0.0, 3.0])
         r, s = np.array([-1.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0])
 
-        dist, closest = edge_edge_distance(p, q, r, s)
+        dist, closest, *_ = edge_edge_distance(p, q, r, s)
 
         assert_close(dist, 2.0, label="dist")
         assert_vec_close(closest, np.array([0.0, 0.0, 2.0]), label="closest_pt")
