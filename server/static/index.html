@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OGC Simulation Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* 3D viewport */
+  #viewport {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+
+  /* Top bar */
+  #topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: rgba(22, 27, 34, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 10;
+    gap: 12px;
+  }
+  #topbar h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #58a6ff;
+    letter-spacing: -0.3px;
+  }
+  .topbar-sep {
+    width: 1px;
+    height: 24px;
+    background: #30363d;
+  }
+  #status {
+    font-size: 12px;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #484f58;
+  }
+  #status .dot.connected { background: #3fb950; }
+  #status .dot.running { background: #d29922; animation: pulse 1s infinite; }
+  #status .dot.error { background: #f85149; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Side panel */
+  #panel {
+    position: absolute;
+    top: 48px; right: 0; bottom: 0;
+    width: 320px;
+    background: rgba(22, 27, 34, 0.95);
+    backdrop-filter: blur(8px);
+    border-left: 1px solid #30363d;
+    z-index: 10;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .section {
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    margin-bottom: 10px;
+  }
+
+  /* File inputs */
+  .file-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .file-row label {
+    font-size: 12px;
+    color: #8b949e;
+    width: 65px;
+    flex-shrink: 0;
+  }
+  .file-row input[type="text"] {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .file-row input:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+
+  /* Parameter grid */
+  .param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .param-item label {
+    font-size: 11px;
+    color: #8b949e;
+  }
+  .param-item input {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    padding: 5px 7px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    width: 100%;
+  }
+  .param-item input:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #21262d;
+    color: #c9d1d9;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #30363d; border-color: #58a6ff; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: #238636;
+    border-color: #2ea043;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-danger {
+    border-color: #f85149;
+    color: #f85149;
+  }
+  .btn-danger:hover { background: #f8514922; }
+
+  /* Info display */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .info-item {
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .info-item span {
+    color: #c9d1d9;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* Log area */
+  #log {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    max-height: 150px;
+    overflow-y: auto;
+    color: #8b949e;
+    line-height: 1.5;
+  }
+  .log-info { color: #58a6ff; }
+  .log-ok { color: #3fb950; }
+  .log-warn { color: #d29922; }
+  .log-err { color: #f85149; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    #panel { width: 100%; top: auto; height: 50%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="viewport"></div>
+
+<div id="topbar">
+  <h1>OGC Simulation</h1>
+  <div class="topbar-sep"></div>
+  <div id="status">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Disconnected</span>
+  </div>
+  <div class="topbar-sep"></div>
+  <div id="stepInfo" style="font-size:12px; color:#8b949e;">
+    Step: <span id="stepNum" style="color:#c9d1d9;">0</span>
+    &nbsp;|&nbsp;
+    Contacts: <span id="contactNum" style="color:#c9d1d9;">0</span>
+  </div>
+</div>
+
+<div id="panel">
+
+  <!-- Mesh loading -->
+  <div class="section">
+    <div class="section-title">Scene</div>
+    <div class="file-row">
+      <label>Cloth</label>
+      <input type="text" id="clothPath" placeholder="/path/to/cloth.obj">
+    </div>
+    <div class="file-row">
+      <label>Obstacle</label>
+      <input type="text" id="obstaclePath" placeholder="/path/to/obstacle.obj">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnLoad">Load Scene</button>
+    </div>
+  </div>
+
+  <!-- Parameters -->
+  <div class="section">
+    <div class="section-title">Physics Parameters</div>
+    <div class="param-grid">
+      <div class="param-item">
+        <label>dt (time step)</label>
+        <input type="number" id="paramDt" value="0.02" step="0.005">
+      </div>
+      <div class="param-item">
+        <label>n_iter (VBD iters)</label>
+        <input type="number" id="paramNIter" value="5" step="1">
+      </div>
+      <div class="param-item">
+        <label>mass</label>
+        <input type="number" id="paramMass" value="1.0" step="0.1">
+      </div>
+      <div class="param-item">
+        <label>k_s (elastic)</label>
+        <input type="number" id="paramKs" value="200" step="10">
+      </div>
+      <div class="param-item">
+        <label>k_c (contact)</label>
+        <input type="number" id="paramKc" value="500" step="50">
+      </div>
+      <div class="param-item">
+        <label>r (contact radius)</label>
+        <input type="number" id="paramR" value="0.05" step="0.01">
+      </div>
+      <div class="param-item">
+        <label>r_q (query radius)</label>
+        <input type="number" id="paramRq" value="0.1" step="0.01">
+      </div>
+      <div class="param-item">
+        <label>gamma_p</label>
+        <input type="number" id="paramGammaP" value="0.45" step="0.05">
+      </div>
+      <div class="param-item" style="grid-column: 1 / -1;">
+        <label>gravity (x, y, z) &mdash; leave 0,0,0 for auto-detect</label>
+        <div style="display:flex; gap:4px;">
+          <input type="number" id="paramGravX" value="0" step="0.5" style="flex:1;" placeholder="X">
+          <input type="number" id="paramGravY" value="0" step="0.5" style="flex:1;" placeholder="Y">
+          <input type="number" id="paramGravZ" value="0" step="0.5" style="flex:1;" placeholder="Z">
+        </div>
+      </div>
+      <div class="param-item">
+        <label>n_steps</label>
+        <input type="number" id="paramNSteps" value="100" step="10">
+      </div>
+    </div>
+  </div>
+
+  <!-- Simulation controls -->
+  <div class="section">
+    <div class="section-title">Simulation</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnRun">Run</button>
+      <button class="btn" id="btnStep">Step</button>
+      <button class="btn" id="btnPause">Pause</button>
+      <button class="btn btn-danger" id="btnReset">Reset</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnExport">Export GLTF</button>
+    </div>
+  </div>
+
+  <!-- Mesh info -->
+  <div class="section">
+    <div class="section-title">Mesh Info</div>
+    <div class="info-grid">
+      <div class="info-item">Cloth verts: <span id="infoClothVerts">-</span></div>
+      <div class="info-item">Cloth faces: <span id="infoClothFaces">-</span></div>
+      <div class="info-item">Obstacle verts: <span id="infoObsVerts">-</span></div>
+      <div class="info-item">Obstacle faces: <span id="infoObsFaces">-</span></div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="section">
+    <div class="section-title">Log</div>
+    <div id="log"></div>
+  </div>
+
+</div>
+
+<!-- Three.js from CDN -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ======================================================================
+// Logging
+// ======================================================================
+const logEl = document.getElementById('log');
+function log(msg, cls = '') {
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ======================================================================
+// Three.js scene setup
+// ======================================================================
+const viewport = document.getElementById('viewport');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+scene.fog = new THREE.Fog(0x0d1117, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
+camera.position.set(3, 3, 3);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewport.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 0, 0);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(5, 8, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+scene.add(dirLight);
+
+const fillLight = new THREE.DirectionalLight(0x6688cc, 0.4);
+fillLight.position.set(-3, 2, -4);
+scene.add(fillLight);
+
+// Ground grid
+const gridHelper = new THREE.GridHelper(10, 20, 0x30363d, 0x21262d);
+scene.add(gridHelper);
+
+// Axes helper
+const axesHelper = new THREE.AxesHelper(1);
+scene.add(axesHelper);
+
+// ======================================================================
+// Mesh objects
+// ======================================================================
+let clothMesh = null;
+let obstacleMesh = null;
+let clothWireframe = null;
+
+const clothMaterial = new THREE.MeshPhongMaterial({
+  color: 0x58a6ff,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.8,
+  shininess: 40,
+});
+
+const clothWireMaterial = new THREE.MeshBasicMaterial({
+  color: 0x79c0ff,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.3,
+});
+
+const obstacleMaterial = new THREE.MeshPhongMaterial({
+  color: 0xd29922,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.7,
+  shininess: 20,
+});
+
+function buildMesh(vertices, faces, material) {
+  const geom = new THREE.BufferGeometry();
+  const verts = new Float32Array(vertices.flat());
+  const indices = new Uint32Array(faces.flat());
+  geom.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  geom.setIndex(new THREE.BufferAttribute(indices, 1));
+  geom.computeVertexNormals();
+  return new THREE.Mesh(geom, material);
+}
+
+function initScene(data) {
+  // Remove old meshes
+  if (clothMesh) { scene.remove(clothMesh); clothMesh.geometry.dispose(); }
+  if (clothWireframe) { scene.remove(clothWireframe); clothWireframe.geometry.dispose(); }
+  if (obstacleMesh) { scene.remove(obstacleMesh); obstacleMesh.geometry.dispose(); }
+
+  // Build cloth
+  clothMesh = buildMesh(data.cloth.vertices, data.cloth.faces, clothMaterial);
+  clothMesh.castShadow = true;
+  clothMesh.receiveShadow = true;
+  scene.add(clothMesh);
+
+  clothWireframe = buildMesh(data.cloth.vertices, data.cloth.faces, clothWireMaterial);
+  scene.add(clothWireframe);
+
+  // Build obstacle
+  obstacleMesh = buildMesh(data.obstacle.vertices, data.obstacle.faces, obstacleMaterial);
+  obstacleMesh.receiveShadow = true;
+  scene.add(obstacleMesh);
+
+  // Update info
+  document.getElementById('infoClothVerts').textContent = data.cloth.vertices.length;
+  document.getElementById('infoClothFaces').textContent = data.cloth.faces.length;
+  document.getElementById('infoObsVerts').textContent = data.obstacle.vertices.length;
+  document.getElementById('infoObsFaces').textContent = data.obstacle.faces.length;
+
+  // Auto-fit camera
+  const box = new THREE.Box3();
+  box.expandByObject(clothMesh);
+  box.expandByObject(obstacleMesh);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(size, size * 0.8, size));
+  controls.update();
+
+  log('Scene loaded', 'log-ok');
+}
+
+function updateClothVertices(positions) {
+  if (!clothMesh) return;
+  const posAttr = clothMesh.geometry.getAttribute('position');
+  const wireAttr = clothWireframe.geometry.getAttribute('position');
+
+  for (let i = 0; i < positions.length; i++) {
+    posAttr.array[i] = positions[i];
+    wireAttr.array[i] = positions[i];
+  }
+  posAttr.needsUpdate = true;
+  wireAttr.needsUpdate = true;
+  clothMesh.geometry.computeVertexNormals();
+}
+
+// ======================================================================
+// Resize
+// ======================================================================
+function onResize() {
+  const panelW = 320;
+  const w = window.innerWidth - panelW;
+  const h = window.innerHeight - 48;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  renderer.domElement.style.marginTop = '48px';
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ======================================================================
+// Render loop
+// ======================================================================
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ======================================================================
+// WebSocket
+// ======================================================================
+let ws = null;
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+function setStatus(state, text) {
+  statusDot.className = 'dot ' + state;
+  statusText.textContent = text;
+}
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    setStatus('connected', 'Connected');
+    log('WebSocket connected', 'log-ok');
+  };
+
+  ws.onclose = () => {
+    setStatus('', 'Disconnected');
+    log('WebSocket disconnected', 'log-warn');
+    setTimeout(connectWS, 2000);
+  };
+
+  ws.onerror = () => {
+    setStatus('error', 'Error');
+  };
+
+  ws.onmessage = (event) => {
+    if (event.data instanceof ArrayBuffer) {
+      // Binary frame: step(u32) | contacts(u32) | n_verts(u32) | positions(f32[])
+      try {
+        const view = new DataView(event.data);
+        const step = view.getUint32(0, true);
+        const contacts = view.getUint32(4, true);
+        const nVerts = view.getUint32(8, true);
+        const positions = new Float32Array(event.data, 12, nVerts * 3);
+
+        console.log(`[WS] Received frame: step=${step}, contacts=${contacts}, verts=${nVerts}`);
+        updateClothVertices(positions);
+        document.getElementById('stepNum').textContent = step;
+        document.getElementById('contactNum').textContent = contacts;
+      } catch (e) {
+        console.error('[WS] Error processing binary frame:', e);
+        log(`Frame error: ${e.message}`, 'log-err');
+      }
+    } else {
+      // JSON message
+      const msg = JSON.parse(event.data);
+      console.log('[WS] JSON message:', msg);
+      if (msg.error) {
+        log(`Error: ${msg.error}`, 'log-err');
+      } else if (msg.status === 'running') {
+        setStatus('running', `Running (${msg.n_steps} steps)`);
+        log(`Simulation started: ${msg.n_steps} steps`, 'log-info');
+      } else if (msg.status === 'done') {
+        setStatus('connected', 'Connected');
+        log(`Simulation complete at step ${msg.step}`, 'log-ok');
+      } else if (msg.status === 'paused') {
+        setStatus('connected', `Paused at step ${msg.step}`);
+        log(`Paused at step ${msg.step}`, 'log-warn');
+      } else if (msg.status === 'reset') {
+        setStatus('connected', 'Reset');
+        document.getElementById('stepNum').textContent = '0';
+        document.getElementById('contactNum').textContent = '0';
+        log('Simulation reset', 'log-info');
+      }
+    }
+  };
+}
+connectWS();
+
+// ======================================================================
+// Button handlers
+// ======================================================================
+
+function getParams() {
+  return {
+    dt: parseFloat(document.getElementById('paramDt').value),
+    n_iter: parseInt(document.getElementById('paramNIter').value),
+    mass: parseFloat(document.getElementById('paramMass').value),
+    k_s: parseFloat(document.getElementById('paramKs').value),
+    k_c: parseFloat(document.getElementById('paramKc').value),
+    r: parseFloat(document.getElementById('paramR').value),
+    r_q: parseFloat(document.getElementById('paramRq').value),
+    gamma_p: parseFloat(document.getElementById('paramGammaP').value),
+    n_steps: parseInt(document.getElementById('paramNSteps').value),
+  };
+}
+
+// Load scene
+document.getElementById('btnLoad').addEventListener('click', async () => {
+  const clothPath = document.getElementById('clothPath').value;
+  const obstaclePath = document.getElementById('obstaclePath').value;
+
+  if (!clothPath || !obstaclePath) {
+    log('Please provide both cloth and obstacle paths', 'log-err');
+    return;
+  }
+
+  const params = getParams();
+  const queryParams = new URLSearchParams({
+    cloth_path: clothPath,
+    obstacle_path: obstaclePath,
+    dt: params.dt,
+    mass: params.mass,
+    k_s: params.k_s,
+    k_c: params.k_c,
+    r: params.r,
+    r_q: params.r_q,
+    gamma_p: params.gamma_p,
+    n_iter: params.n_iter,
+    n_steps: params.n_steps,
+    gravity_x: parseFloat(document.getElementById('paramGravX').value),
+    gravity_y: parseFloat(document.getElementById('paramGravY').value),
+    gravity_z: parseFloat(document.getElementById('paramGravZ').value),
+  });
+
+  log('Loading scene...', 'log-info');
+  try {
+    const resp = await fetch(`/load?${queryParams}`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) {
+      log(`Load error: ${data.error}`, 'log-err');
+      return;
+    }
+    initScene(data);
+  } catch (e) {
+    log(`Load failed: ${e.message}`, 'log-err');
+  }
+});
+
+// Run
+document.getElementById('btnRun').addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    log('WebSocket not connected', 'log-err');
+    return;
+  }
+  const nSteps = parseInt(document.getElementById('paramNSteps').value);
+  ws.send(JSON.stringify({ cmd: 'run', n_steps: nSteps }));
+});
+
+// Step
+document.getElementById('btnStep').addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    log('WebSocket not connected', 'log-err');
+    return;
+  }
+  ws.send(JSON.stringify({ cmd: 'step' }));
+});
+
+// Pause
+document.getElementById('btnPause').addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ cmd: 'pause' }));
+});
+
+// Reset
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ cmd: 'reset' }));
+});
+
+// Export GLTF
+document.getElementById('btnExport').addEventListener('click', async () => {
+  log('Exporting GLTF...', 'log-info');
+  try {
+    const resp = await fetch('/export');
+    if (!resp.ok) {
+      const data = await resp.json();
+      log(`Export error: ${data.error}`, 'log-err');
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'simulation.glb';
+    a.click();
+    URL.revokeObjectURL(url);
+    log('GLTF exported', 'log-ok');
+  } catch (e) {
+    log(`Export failed: ${e.message}`, 'log-err');
+  }
+});
+
+log('Viewer ready', 'log-ok');
+
+</script>
+</body>
+</html>

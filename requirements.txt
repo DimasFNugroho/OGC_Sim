@@ -6,3 +6,6 @@ trimesh
 polyscope
 networkx
 pytest
+fastapi
+uvicorn[standard]
+python-multipart
